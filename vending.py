@@ -1,24 +1,38 @@
 from collections import Counter
 from dataclasses import dataclass
 from decimal import Decimal
+from math import ceil
 import typing
 
 ProductName = typing.NewType('ProductName', str)
 SlotCode = typing.NewType('SlotCode', str)
 Assortment = typing.Dict[ProductName, 'Product']
-Coins = Counter[Decimal, int]
+Coins = typing.Counter[Decimal]
 Menu = typing.Dict[ProductName, typing.Tuple[SlotCode, Decimal]]
+
+
+def add_assortments(asrt1: Assortment, asrt2: Assortment) -> Assortment:
+    result = {**asrt1, **asrt2}
+    for product_name in result.keys():
+        if product_name in asrt1.keys() and product_name in asrt2.keys():
+            result[product_name] = asrt1[product_name] + asrt2[product_name]
+    return result
 
 
 class MachineOverloadedException(Exception):
     pass
 
 
-@dataclass
 class Product:
-    name: ProductName
-    quantity: int
-    price: Decimal
+    def __init__(self, name: ProductName, quantity: int, price: Decimal):
+        self.name = name
+        self.quantity = quantity
+        self.price = price
+
+    def __add__(self, other):
+        if self.name != other.name or self.price != other.price:
+            raise ValueError("Products are not the same type")
+        return Product(self.name, self.quantity + other.quantity, self.price)
 
 
 class Machine:
@@ -26,17 +40,33 @@ class Machine:
         self.coins = Coins()
         self.slot_depth = slot_depth
         self.slots: typing.Dict[SlotCode, Product] = {str(i): None for i in range(slots)}
+        self.assortment: Assortment = Assortment
 
-    def load_products(self, assortment: Assortment) -> None:
-        for product_name, product in assortment.items():
-            if product_name in [product.name for product in self.slots.values()]:
-                pass
+    def _arrange_slots(self) -> None:
+        index = 0
+        for product in self.assortment.values():
+            product_units = product.quantity
+            slots_taken = ceil(product.quantity / self.slot_depth)
+            for _ in range(slots_taken):
+                number_of_products_in_slot = min(self.slot_depth, product_units)
+                self.slots[SlotCode(str(index))] = Product(product.name, number_of_products_in_slot, product.price)
+                index += 1
+                product_units -= number_of_products_in_slot
+
+    def _get_slot_code(self, product_name: ProductName):
+        for slot_code, product in self.slots.items():
+            if product.name == product_name:
+                return slot_code
+
+    def load_products(self, delivery: Assortment) -> None:
+        self.assortment = add_assortments(self.assortment, delivery)
+        self._arrange_slots()
 
     def load_coins(self, coins: Coins) -> None:
         pass
 
     def get_available_products(self) -> Menu:
-        pass
+        return {product_name: (self._get_slot_code(product_name), product.price) for product_name, product in self.assortment}
 
     def choose_product(self, product_code: SlotCode, money: Coins) -> typing.Tuple[typing.Optional[Product], typing.Optional[Coins]]:
         pass
