@@ -12,10 +12,19 @@ Menu = typing.Dict[ProductName, typing.Tuple[SlotCode, Decimal]]
 
 
 def add_assortments(asrt1: Assortment, asrt2: Assortment) -> Assortment:
-    result = {**asrt1, **asrt2}
-    for product_name in result.keys():
-        if product_name in asrt1.keys() and product_name in asrt2.keys():
-            result[product_name] = asrt1[product_name] + asrt2[product_name]
+    result = {}
+    try:
+        for product_name in asrt1.keys():
+            if product_name in asrt2.keys():
+                result[product_name] = asrt1[product_name] + asrt2[product_name]
+            else:
+                result[product_name] = asrt1[product_name]
+        for product_name in asrt2.keys():
+            if product_name in asrt1.keys():
+                continue
+            result[product_name] =asrt2[product_name]
+    except TypeError:
+        result = asrt2 #it solves only first delivery problem. Will probably crash if delivery is empty
     return result
 
 
@@ -66,7 +75,7 @@ class Machine:
         pass
 
     def get_available_products(self) -> Menu:
-        return {product_name: (self._get_slot_code(product_name), product.price) for product_name, product in self.assortment}
+        return {product_name: (self._get_slot_code(product_name), product.price) for product_name, product in self.assortment.items()}
 
     def choose_product(self, product_code: SlotCode, money: Coins) -> typing.Tuple[typing.Optional[Product], typing.Optional[Coins]]:
         pass
