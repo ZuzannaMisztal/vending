@@ -11,24 +11,35 @@ Coins = typing.Counter[Decimal]
 Menu = typing.Dict[ProductName, typing.Tuple[SlotCode, Decimal]]
 
 
-def add_assortments(asrt1: Assortment, asrt2: Assortment) -> Assortment:
+def sum_of_coins(coins: Coins) -> Decimal:
+    sum: Decimal = Decimal(0)
+    for nominal, quantity in coins.most_common():
+        sum += nominal * quantity
+    return sum
+
+
+def add_assortments(assortment1: Assortment, assortment2: Assortment) -> Assortment:
     result = {}
     try:
-        for product_name in asrt1.keys():
-            if product_name in asrt2.keys():
-                result[product_name] = asrt1[product_name] + asrt2[product_name]
+        for product_name in assortment1.keys():
+            if product_name in assortment2.keys():
+                result[product_name] = assortment1[product_name] + assortment2[product_name]
             else:
-                result[product_name] = asrt1[product_name]
-        for product_name in asrt2.keys():
-            if product_name in asrt1.keys():
+                result[product_name] = assortment1[product_name]
+        for product_name in assortment2.keys():
+            if product_name in assortment1.keys():
                 continue
-            result[product_name] =asrt2[product_name]
+            result[product_name] = assortment2[product_name]
     except TypeError:
-        result = asrt2 #it solves only first delivery problem. Will probably crash if delivery is empty
+        result = assortment2 #it solves only first delivery problem. Will probably crash if delivery is empty
     return result
 
 
 class MachineOverloadedException(Exception):
+    pass
+
+
+class NotEnoughMoneyInMachineException(Exception):
     pass
 
 
@@ -46,8 +57,9 @@ class Product:
 
 class Machine:
     def __init__(self, slots: int, slot_depth: int) -> None:
-        self.coins = Coins()
+        self.coins: Coins = Coins()
         self.slot_depth = slot_depth
+        self.number_of_slots = slots
         self.slots: typing.Dict[SlotCode, Product] = {str(i): None for i in range(slots)}
         self.assortment: Assortment = Assortment
 
@@ -59,8 +71,10 @@ class Machine:
             for _ in range(slots_taken):
                 number_of_products_in_slot = min(self.slot_depth, product_units)
                 self.slots[SlotCode(str(index))] = Product(product.name, number_of_products_in_slot, product.price)
-                index += 1
                 product_units -= number_of_products_in_slot
+                index += 1
+                if index > self.number_of_slots:
+                    raise MachineOverloadedException
 
     def _get_slot_code(self, product_name: ProductName):
         for slot_code, product in self.slots.items():
@@ -72,16 +86,54 @@ class Machine:
         self._arrange_slots()
 
     def load_coins(self, coins: Coins) -> None:
-        pass
+        self.coins.update(coins)
 
     def get_available_products(self) -> Menu:
-        return {product_name: (self._get_slot_code(product_name), product.price) for product_name, product in self.assortment.items()}
+        items = {product_name: (self._get_slot_code(product_name), product.price) for product_name, product in self.assortment.items()}
+        return items
 
     def choose_product(self, product_code: SlotCode, money: Coins) -> typing.Tuple[typing.Optional[Product], typing.Optional[Coins]]:
-        pass
+        if product_code not in self.slots.keys():
+            return None, money
+        slot = self.slots[product_code]
+        if slot is None or slot.quantity == 0 or sum_of_coins(money) < slot.price:
+            return None, money
+        self.load_coins(money)
+        try:
+            change: Coins = self._get_change(money, slot.price)
+            self._give_coins(change)
+            slot.quantity -= 1
+            self.assortment[slot.name].quantity -= 1
+            return Product(slot.name, 1, slot.price), change
+        except NotEnoughMoneyInMachineException:
+            self._give_coins(money)
+            return None, money
 
     def get_balance(self) -> Decimal:
-        pass
+        return sum_of_coins(self.coins)
 
     def cash_out(self) -> Coins:
         pass
+
+    def _get_change(self, money: Coins, price: Decimal) -> Coins:
+        if sum_of_coins(money) == price:
+            return None
+        to_return = Coins()
+        amount_of_money_yet_to_return = sum_of_coins(money) - price
+        for nominal, quantity in sorted(self.coins.items(), reverse=True):
+            quantity_to_give: int = min(amount_of_money_yet_to_return // nominal, quantity)
+            if quantity_to_give > 0:
+                to_return[nominal] = quantity_to_give
+                amount_of_money_yet_to_return -= quantity_to_give * nominal
+            if amount_of_money_yet_to_return == 0:
+                return to_return
+        raise NotEnoughMoneyInMachineException
+
+    def _give_coins(self, change: Coins) -> None:
+        if change is None:
+            return None
+        for nominal, quantity in change.items():
+            if self.coins[nominal] < quantity:
+                raise NotEnoughMoneyInMachineException
+            self.coins[nominal] -= quantity
+
