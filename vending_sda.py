@@ -208,6 +208,24 @@ class TestVendingMachine(unittest.TestCase):
         self.assertIsNotNone(change)
         self.assertEqual(change, Coins({Decimal('2.1'): 1}))
 
+    def test_machine_can_rearrange(self):
+        machine = Machine(slots=4, slot_depth=10)
+        first_delivery = {
+            ProductName("coca-cola"): Product(name=ProductName("coca-cola"), quantity=11, price=Decimal('2.1')),
+            ProductName("mars"): Product(name=ProductName("mars"), quantity=15, price=Decimal('1.9')),
+        }
+        machine.load_products(first_delivery)
+        cola_slot_code, _ = machine.get_available_products()[ProductName('coca-cola')]
+        _, _ = machine.choose_product(cola_slot_code, Coins({Decimal('2.1'): 1}))
+        for _ in range(6):
+            mars_slot_code, _ = machine.get_available_products()[ProductName('mars')]
+            _, _ = machine.choose_product(mars_slot_code, Coins({Decimal('1.9'): 1}))
+        second_delivery = {
+            ProductName("orbit"): Product(name=ProductName("orbit"), quantity=15, price=Decimal('2.3')),
+        }
+        machine.load_products(second_delivery)
+        self.assertIn(ProductName("orbit"), machine.get_available_products().keys())
+
 
 if __name__ == '__main__':
     unittest.main()
