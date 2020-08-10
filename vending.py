@@ -19,19 +19,18 @@ def sum_of_coins(coins: Coins) -> Decimal:
 
 
 def add_assortments(assortment1: Assortment, assortment2: Assortment) -> Assortment:
+    if assortment1 is None:
+        return assortment2
     result = {}
-    try:
-        for product_name in assortment1.keys():
-            if product_name in assortment2.keys():
-                result[product_name] = assortment1[product_name] + assortment2[product_name]
-            else:
-                result[product_name] = assortment1[product_name]
-        for product_name in assortment2.keys():
-            if product_name in assortment1.keys():
-                continue
-            result[product_name] = assortment2[product_name]
-    except TypeError:
-        result = assortment2 #it solves only first delivery problem. Will probably crash if delivery is empty
+    for product_name in assortment1.keys():
+        if product_name in assortment2.keys():
+            result[product_name] = assortment1[product_name] + assortment2[product_name]
+        else:
+            result[product_name] = assortment1[product_name]
+    for product_name in assortment2.keys():
+        if product_name in assortment1.keys():
+            continue
+        result[product_name] = assortment2[product_name]
     return result
 
 
@@ -61,7 +60,7 @@ class Machine:
         self.slot_depth = slot_depth
         self.number_of_slots = slots
         self.slots: typing.Dict[SlotCode, Product] = {str(i): None for i in range(slots)}
-        self.assortment: Assortment = Assortment
+        self.assortment = None
 
     def _arrange_slots(self) -> None:
         index = 0
