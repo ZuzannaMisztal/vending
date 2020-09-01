@@ -146,6 +146,23 @@ class TestVendingMachine(unittest.TestCase):
         self.assertEqual(product.name, ProductName("coca-cola"))
         self.assertEqual(change, Coins({Decimal('0.2'): 2}))
 
+    def test_can_give_smart_change(self):
+        machine = Machine(slots=3, slot_depth=10)
+        products = {
+            ProductName("coca-cola"): Product(name=ProductName("coca-cola"), quantity=7, price=Decimal('2.1')),
+            ProductName("mars"): Product(name=ProductName("mars"), quantity=5, price=Decimal('1.9')),
+            ProductName("orbit"): Product(name=ProductName("orbit"), quantity=6, price=Decimal('1.4')),
+        }
+        machine.load_products(products)
+        money = Coins({Decimal('0.2'): 3, Decimal('0.5'): 1})
+        machine.load_coins(money)
+        slot_code, _ = machine.get_available_products()[ProductName("orbit")]
+        product, change = machine.choose_product(slot_code, Coins({Decimal(2): 1}))
+        self.assertIsNotNone(product)
+        self.assertIsNotNone(change)
+        self.assertEqual(product.name, ProductName("orbit"))
+        self.assertEqual(change, Coins({Decimal('0.2'): 3}))
+
     def test_cant_get_product_for_too_little_money(self):
         machine = Machine(slots=3, slot_depth=10)
         products = {
@@ -171,7 +188,7 @@ class TestVendingMachine(unittest.TestCase):
         machine.load_products(products)
         money = Coins({Decimal(5): 1})
         nonexistent_slot_code = SlotCode("doesn't exist")
-        self.assertNotIn(nonexistent_slot_code, [code for code, _ in machine.get_available_products().items()]) #dodane .items()
+        self.assertNotIn(nonexistent_slot_code, [code for code, _ in machine.get_available_products().items()])
         product, change = machine.choose_product(nonexistent_slot_code, money)
         self.assertIsNone(product)
         self.assertEqual(money, change)
